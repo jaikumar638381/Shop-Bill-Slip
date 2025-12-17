@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sri Murugan Hot Chips — Bill Generator (Download)</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background:#f5f7fb; }
+    .brand { font-weight:700; letter-spacing:0.2px; }
+    .card-app { border-radius:12px; box-shadow:0 6px 20px rgba(16,24,40,0.06); }
+    .table-sm td, .table-sm th { padding:.45rem; vertical-align:middle; }
+    .no-print { display: inline-block; }
+    @media print {
+      .no-print { display:none !important; }
+      body * { visibility: hidden; }
+      #invoicePreview, #invoicePreview * { visibility: visible; }
+      #invoicePreview { position: absolute; top: 0; left: 0; width: 100%; }
+    }
+    /* ensure invoice has white background when exported */
+    #invoicePreview { background: white; padding: 18px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h3 class="brand mb-0">Sri Murugan Hot Chips</h3>
+        <small class="text-muted">Bill / Invoice Generator</small>
+      </div>
+      <div class="text-end">
+        <small class="text-muted">Tasty chips, happy customers</small>
+      </div>
+    </div>
+
+    <div class="card card-app p-3 mb-3">
+      <div class="row g-3">
+        <div class="col-lg-7">
+          <!-- Customer & Invoice info -->
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label">Customer Name</label>
+              <input id="custName" class="form-control" placeholder="e.g., Mr. Ramesh">
+            </div>
+            <div class="col-3">
+              <label class="form-label">Bill No.</label>
+              <input id="billNo" class="form-control" placeholder="B001">
+            </div>
+            <div class="col-3">
+              <label class="form-label">Date</label>
+              <input id="billDate" type="date" class="form-control">
+            </div>
+          </div>
+
+          <!-- Items table -->
+          <div class="table-responsive mb-2">
+            <table class="table table-sm table-bordered align-middle" id="itemsTable">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:42%;">Description</th>
+                  <th style="width:12%;">Qty</th>
+                  <th style="width:18%;">Rate (₹)</th>
+                  <th style="width:18%;">Amount (₹)</th>
+                  <th style="width:10%;" class="no-print"> </th>
+                </tr>
+              </thead>
+              <tbody id="itemsBody"></tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="5" class="p-2">
+                    <button class="btn btn-sm btn-outline-primary" type="button" onclick="addItemRow()">+ Add item</button>
+                    <button class="btn btn-sm btn-outline-danger ms-2" type="button" onclick="clearItems()">Clear items</button>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Controls: discount, tax -->
+          <div class="row g-2">
+            <div class="col-4">
+              <label class="form-label">Discount (₹)</label>
+              <input id="discount" type="number" min="0" step="0.01" class="form-control" value="0">
+            </div>
+            <div class="col-4">
+              <label class="form-label">GST (%)</label>
+              <input id="taxPercent" type="number" min="0" step="0.01" class="form-control" value="5">
+            </div>
+            <div class="col-4">
+              <label class="form-label">Round Off</label>
+              <select id="roundOption" class="form-select">
+                <option value="auto" selected>Auto (nearest ₹)</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-primary" onclick="renderPreview()">Generate Bill</button>
+            <button class="btn btn-success" onclick="printInvoice()">Print</button>
+            <button class="btn btn-outline-secondary" onclick="resetForm()">Reset</button>
+            <!-- Download buttons -->
+            <div class="ms-auto">
+              <button class="btn btn-sm btn-outline-dark me-1" onclick="downloadPDF()">Download PDF</button>
+              <button class="btn btn-sm btn-outline-dark me-1" onclick="downloadPNG()">Download PNG</button>
+              <button class="btn btn-sm btn-outline-dark" onclick="downloadJSON()">Download JSON</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-5">
+          <!-- Live totals -->
+          <div class="border rounded p-3 bg-white">
+            <h6 class="mb-3">Summary</h6>
+            <div class="d-flex justify-content-between">
+              <div>Subtotal</div><div>₹ <span id="subtotalOut">0.00</span></div>
+            </div>
+            <div class="d-flex justify-content-between">
+              <div>Discount</div><div>- ₹ <span id="discountOut">0.00</span></div>
+            </div>
+            <div class="d-flex justify-content-between">
+              <div>Tax (<span id="taxLabel">5</span>%)</div><div>₹ <span id="taxOut">0.00</span></div>
+            </div>
+            <hr>
+            <div class="d-flex justify-content-between fw-bold fs-5">
+              <div>Grand Total</div><div>₹ <span id="grandOut">0.00</span></div>
+            </div>
+            <div class="mt-2 small text-muted">Amount in words:</div>
+            <div class="fw-medium" id="amountWords">Zero rupees only</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview / Invoice area -->
+    <div id="invoicePreview" class="card p-3 mb-3">
+      <div class="text-center mb-2">
+        <h4 class="mb-0">Sri Murugan Hot Chips</h4>
+        <small class="text-muted">Tasty chips, happy customers</small>
+      </div>
+      <div id="previewContent">
+        <div class="text-center text-muted">No bill generated yet. Click "Generate Bill".</div>
+      </div>
+    </div>
+
+    <footer class="text-center small text-muted">
+      © Sri Murugan Hot Chips
+    </footer>
+  </div>
+
+  <!-- External libs for downloads -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <script>
+    // Utilities
+    function formatRupee(x){
+      const n = Number(x) || 0;
+      return n.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+    }
+
+    function numberToWordsIN(amount){
+      if (isNaN(amount) || amount === 0) return 'Zero rupees only';
+      const ones = ['','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
+      const tens = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+      function twoDigit(n){
+        if (n < 20) return ones[n];
+        const t = Math.floor(n/10);
+        const o = n%10;
+        return tens[t] + (o ? ' ' + ones[o] : '');
+      }
+      function threeDigit(n){
+        const h = Math.floor(n/100);
+        const r = n%100;
+        let s = '';
+        if (h) s += ones[h] + ' hundred' + (r ? ' and ' : '');
+        if (r) s += twoDigit(r);
+        return s;
+      }
+      function inWords(n){
+        let s = '';
+        if (n >= 10000000){
+          s += inWords(Math.floor(n/10000000)) + ' crore ';
+          n = n % 10000000;
+        }
+        if (n >= 100000){
+          s += inWords(Math.floor(n/100000)) + ' lakh ';
+          n = n % 100000;
+        }
+        if (n >= 1000){
+          s += inWords(Math.floor(n/1000)) + ' thousand ';
+          n = n % 1000;
+        }
+        if (n > 0){
+          s += threeDigit(n);
+        }
+        return s.trim();
+      }
+
+      const rupees = Math.floor(amount);
+      const paise = Math.round((amount - rupees) * 100);
+      let words = '';
+      if (rupees > 0) words += (inWords(rupees) || 'zero') + ' rupees';
+      if (paise > 0) words += ' and ' + (twoDigit(paise) || 'zero') + ' paise';
+      words = words.charAt(0).toUpperCase() + words.slice(1) + ' only';
+      return words;
+    }
+
+    // Items management
+    let itemIdCounter = 0;
+    function addItemRow(desc='', qty=1, rate=0){
+      itemIdCounter++;
+      const id = 'item' + itemIdCounter;
+      const tbody = document.getElementById('itemsBody');
+      const row = document.createElement('tr');
+      row.id = id;
+      row.innerHTML = `
+        <td><input class="form-control form-control-sm" placeholder="Item description" value="${escapeHtml(desc)}" oninput="recalculate()"></td>
+        <td><input type="number" min="0" step="1" class="form-control form-control-sm" value="${qty}" oninput="recalculate()"></td>
+        <td><input type="number" min="0" step="0.01" class="form-control form-control-sm" value="${rate}" oninput="recalculate()"></td>
+        <td class="text-end align-middle">₹ <span class="lineAmount">0.00</span></td>
+        <td class="text-center no-print"><button class="btn btn-sm btn-outline-danger" onclick="removeItem('${id}')">✕</button></td>
+      `;
+      tbody.appendChild(row);
+      recalculate();
+    }
+    function removeItem(id){
+      const el = document.getElementById(id);
+      if (el) el.remove();
+      recalculate();
+    }
+    function clearItems(){
+      document.getElementById('itemsBody').innerHTML = '';
+      recalculate();
+    }
+
+    function escapeHtml(text){
+      if (!text) return '';
+      return String(text).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+    }
+
+    // Calculation
+    function recalculate(){
+      const tbody = document.getElementById('itemsBody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      let subtotal = 0;
+      rows.forEach(r => {
+        const inputs = r.querySelectorAll('input');
+        const qty = Number(inputs[1].value) || 0;
+        const rate = Number(inputs[2].value) || 0;
+        const lineCents = Math.round(qty * rate * 100);
+        const lineAmount = lineCents / 100;
+        subtotal += lineAmount;
+        r.querySelector('.lineAmount').textContent = formatRupee(lineAmount);
+      });
+
+      document.getElementById('subtotalOut').textContent = formatRupee(subtotal);
+      const discount = Number(document.getElementById('discount').value) || 0;
+      document.getElementById('discountOut').textContent = formatRupee(discount);
+      const taxPercent = Number(document.getElementById('taxPercent').value) || 0;
+      document.getElementById('taxLabel').textContent = taxPercent.toFixed(2);
+      const taxable = Math.max(subtotal - discount, 0);
+      const tax = Math.round(taxable * (taxPercent/100) * 100) / 100;
+      document.getElementById('taxOut').textContent = formatRupee(tax);
+      let grand = Math.max(taxable + tax, 0);
+      const roundOption = document.getElementById('roundOption').value;
+      if (roundOption === 'auto'){
+        grand = Math.round(grand);
+      }
+      document.getElementById('grandOut').textContent = formatRupee(grand);
+      document.getElementById('amountWords').textContent = numberToWordsIN(grand);
+    }
+
+    // Build preview HTML
+    function renderPreview(){
+      if (!document.getElementById('itemsBody').children.length){
+        addItemRow('Hot Chips Packet',1,30);
+      }
+      recalculate();
+
+      const cust = escapeHtml(document.getElementById('custName').value) || '—';
+      const billNo = escapeHtml(document.getElementById('billNo').value) || '—';
+      const dateVal = document.getElementById('billDate').value;
+      const dateDisplay = dateVal ? (new Date(dateVal)).toLocaleDateString('en-IN') : (new Date()).toLocaleDateString('en-IN');
+
+      const rows = Array.from(document.getElementById('itemsBody').querySelectorAll('tr'));
+      let itemsHtml = '';
+      rows.forEach((r,i) => {
+        const inputs = r.querySelectorAll('input');
+        const desc = escapeHtml(inputs[0].value) || '—';
+        const qty = Number(inputs[1].value) || 0;
+        const rate = Number(inputs[2].value) || 0;
+        const amt = r.querySelector('.lineAmount').textContent || '0.00';
+        itemsHtml += `<tr>
+          <td>${i+1}</td>
+          <td>${desc}</td>
+          <td class="text-end">${qty}</td>
+          <td class="text-end">₹ ${formatRupee(rate)}</td>
+          <td class="text-end">₹ ${amt}</td>
+        </tr>`;
+      });
+
+      const subtotal = Number(document.getElementById('subtotalOut').textContent.replaceAll(',','')) || 0;
+      const discount = Number(document.getElementById('discount').value) || 0;
+      const tax = Number(document.getElementById('taxOut').textContent.replaceAll(',','')) || 0;
+      const grand = Number(document.getElementById('grandOut').textContent.replaceAll(',','')) || 0;
+
+      const previewHTML = `
+        <div class="row">
+          <div class="col-8">
+            <strong>Sri Murugan Hot Chips</strong><br>
+            <small class="text-muted">Tasty chips, happy customers</small><br>
+            <small class="text-muted">GSTIN: 33AAAAA0000A1Z</small>
+          </div>
+          <div class="col-4 text-end">
+            <div>Bill No: <strong>${billNo}</strong></div>
+            <div>Date: <strong>${dateDisplay}</strong></div>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <div><strong>Customer:</strong> ${cust}</div>
+        </div>
+
+        <div class="table-responsive mt-2">
+          <table class="table table-sm">
+            <thead class="table-light">
+              <tr>
+                <th style="width:6%;">#</th>
+                <th>Description</th>
+                <th style="width:12%;" class="text-end">Qty</th>
+                <th style="width:18%;" class="text-end">Rate</th>
+                <th style="width:18%;" class="text-end">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="row justify-content-end">
+          <div class="col-5">
+            <table class="table table-sm">
+              <tbody>
+                <tr>
+                  <td>Subtotal</td><td class="text-end">₹ ${formatRupee(subtotal)}</td>
+                </tr>
+                <tr>
+                  <td>Discount</td><td class="text-end">- ₹ ${formatRupee(discount)}</td>
+                </tr>
+                <tr>
+                  <td>Tax</td><td class="text-end">₹ ${formatRupee(tax)}</td>
+                </tr>
+                <tr class="table-active">
+                  <th>Total</th><th class="text-end">₹ ${formatRupee(grand)}</th>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <strong>Amount (in words):</strong> ${numberToWordsIN(grand)}
+        </div>
+
+        <div class="mt-4 d-flex justify-content-between">
+          <div class="small text-muted">Thank you for your purchase!</div>
+          <div class="text-end">
+            <div>Authorised Signatory</div>
+            <div style="margin-top:28px;">______________________</div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('previewContent').innerHTML = previewHTML;
+    }
+
+    // Print
+    function printInvoice(){
+      renderPreview();
+      window.print();
+    }
+
+    // Download PDF using html2pdf.js (returns a Promise)
+    async function downloadPDF(){
+      renderPreview();
+      // filename uses bill no + date
+      const billNo = (document.getElementById('billNo').value || 'bill').replaceAll(' ','_');
+      const dateVal = document.getElementById('billDate').value || new Date().toISOString().slice(0,10);
+      const filename = `SriMuruganHotChips_${billNo}_${dateVal}.pdf`;
+
+      const element = document.getElementById('invoicePreview');
+      // html2pdf options tuned for good print quality
+      const opt = {
+        margin:       10,
+        filename:     filename,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      // generate and save
+      html2pdf().set(opt).from(element).save();
+    }
+
+    // Download PNG (html2canvas)
+    async function downloadPNG(){
+      renderPreview();
+      const element = document.getElementById('invoicePreview');
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const dataUrl = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      const billNo = (document.getElementById('billNo').value || 'bill').replaceAll(' ','_');
+      const dateVal = document.getElementById('billDate').value || new Date().toISOString().slice(0,10);
+      link.download = `SriMuruganHotChips_${billNo}_${dateVal}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    // Download JSON (data export)
+    function downloadJSON(){
+      // build data structure
+      const rows = Array.from(document.getElementById('itemsBody').querySelectorAll('tr'));
+      const items = rows.map(r=>{
+        const inputs = r.querySelectorAll('input');
+        return {
+          description: inputs[0].value || '',
+          qty: Number(inputs[1].value) || 0,
+          rate: Number(inputs[2].value) || 0,
+          amount: Number((r.querySelector('.lineAmount').textContent || '0').replaceAll(',',''))
+        };
+      });
+      const data = {
+        company: 'Sri Murugan Hot Chips',
+        gstin: '33AAAAA0000A1Z',
+        billNo: document.getElementById('billNo').value || '',
+        date: document.getElementById('billDate').value || new Date().toISOString().slice(0,10),
+        customer: document.getElementById('custName').value || '',
+        items,
+        subtotal: Number((document.getElementById('subtotalOut').textContent || '0').replaceAll(',','')),
+        discount: Number(document.getElementById('discount').value) || 0,
+        taxPercent: Number(document.getElementById('taxPercent').value) || 0,
+        tax: Number((document.getElementById('taxOut').textContent || '0').replaceAll(',','')),
+        grand: Number((document.getElementById('grandOut').textContent || '0').replaceAll(',','')),
+        amountWords: document.getElementById('amountWords').textContent || ''
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const billNoSafe = (data.billNo || 'bill').replaceAll(' ','_');
+      link.download = `SriMuruganHotChips_${billNoSafe}_${data.date}.json`;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    // Reset everything
+    function resetForm(){
+      document.getElementById('custName').value = '';
+      document.getElementById('billNo').value = '';
+      document.getElementById('billDate').value = '';
+      document.getElementById('discount').value = 0;
+      document.getElementById('taxPercent').value = 5;
+      document.getElementById('roundOption').value = 'auto';
+      clearItems();
+      addItemRow('Hot Chips Packet (Small)',1,20);
+      addItemRow('Hot Chips Packet (Large)',1,50);
+      document.getElementById('previewContent').innerHTML = '<div class="text-center text-muted">No bill generated yet. Click "Generate Bill".</div>';
+      recalculate();
+    }
+
+    // On load defaults
+    window.addEventListener('DOMContentLoaded', ()=>{
+      const today = new Date().toISOString().slice(0,10);
+      document.getElementById('billDate').value = today;
+      addItemRow('Hot Chips Packet (Small)',1,20);
+      addItemRow('Hot Chips Packet (Large)',1,50);
+      recalculate();
+    });
+
+    // recalc triggers
+    document.getElementById('discount').addEventListener('input', recalculate);
+    document.getElementById('taxPercent').addEventListener('input', recalculate);
+    document.getElementById('roundOption').addEventListener('change', recalculate);
+  </script>
+</body>
+</html>
